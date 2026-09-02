@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -28,10 +31,21 @@ jobs:
       - name: Build Tauri app (Windows installers)
         run: npm run tauri build
 
-      - name: Upload installers
+      - name: Upload installers (build artifact)
         uses: actions/upload-artifact@v4
         with:
           name: TransformerSP-Windows-Installers
           path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+
+      - name: Publish public release with installers
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-windows
+          name: TransformerSP (Windows) - último build
+          body: Instalador generado automáticamente desde el último commit en main. No requiere login para descargar.
+          make_latest: true
+          files: |
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/msi/*.msi
