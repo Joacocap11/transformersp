@@ -32,8 +32,25 @@ fn file_info(path: String) -> Result<FileInfo, String> {
     })
 }
 
-fn ffmpeg_args_for_format(fmt: &str) -> Result<Vec<&'static str>, String> {
-    let args: Vec<&'static str> = match fmt {
+const VIDEO_FORMATS: [&str; 5] = ["mp4", "mov", "mkv", "avi", "webm"];
+
+fn target_height_for_quality(quality: &str) -> Result<Option<u32>, String> {
+    match quality {
+        "original" => Ok(None),
+        "2160" => Ok(Some(2160)),
+        "1440" => Ok(Some(1440)),
+        "1080" => Ok(Some(1080)),
+        "720" => Ok(Some(720)),
+        "480" => Ok(Some(480)),
+        "360" => Ok(Some(360)),
+        "240" => Ok(Some(240)),
+        "144" => Ok(Some(144)),
+        other => Err(format!("Calidad no soportada: {other}")),
+    }
+}
+
+fn ffmpeg_args_for_format(fmt: &str, quality: &str) -> Result<Vec<String>, String> {
+    let codec_args: Vec<&'static str> = match fmt {
         "mp4" | "mov" | "mkv" => vec![
             "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k",
@@ -51,6 +68,18 @@ fn ffmpeg_args_for_format(fmt: &str) -> Result<Vec<&'static str>, String> {
         "ogg" => vec!["-vn", "-c:a", "libvorbis", "-q:a", "5"],
         other => return Err(format!("Formato de salida no soportado todavia: {other}")),
     };
+
+    let mut args: Vec<String> = Vec::with_capacity(codec_args.len() + 2);
+
+    if VIDEO_FORMATS.contains(&fmt) {
+        if let Some(height) = target_height_for_quality(quality)? {
+            // "min(ih,H)" nunca agranda un video que ya sea mas chico que la calidad elegida.
+            args.push("-vf".into());
+            args.push(format!("scale=-2:min(ih\\,{height})"));
+        }
+    }
+
+    args.extend(codec_args.iter().map(|s| s.to_string()));
     Ok(args)
 }
 
@@ -102,9 +131,11 @@ async fn convert_file(
     job_id: String,
     input_path: String,
     output_format: String,
+    quality: Option<String>,
 ) -> Result<String, String> {
     let fmt = output_format.to_lowercase();
-    let codec_args = ffmpeg_args_for_format(&fmt)?;
+    let quality = quality.unwrap_or_else(|| "original".to_string()).to_lowercase();
+    let codec_args = ffmpeg_args_for_format(&fmt, &quality)?;
 
     let input = Path::new(&input_path);
     let stem = input
@@ -119,7 +150,7 @@ async fn convert_file(
     let duration = probe_duration_secs(&app, &input_path).await.unwrap_or(0.0);
 
     let mut args: Vec<String> = vec!["-y".into(), "-i".into(), input_path.clone()];
-    args.extend(codec_args.iter().map(|s| s.to_string()));
+    args.extend(codec_args);
     args.push("-progress".into());
     args.push("pipe:1".into());
     args.push("-nostats".into());

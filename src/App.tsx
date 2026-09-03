@@ -29,6 +29,18 @@ const TAB_LABEL: Record<MediaKind, string> = {
   audio: "Audio",
 };
 
+const VIDEO_QUALITIES: { value: string; label: string }[] = [
+  { value: "original", label: "Original (sin cambios)" },
+  { value: "2160", label: "4K (2160p)" },
+  { value: "1440", label: "2K (1440p)" },
+  { value: "1080", label: "Full HD (1080p)" },
+  { value: "720", label: "HD (720p)" },
+  { value: "480", label: "SD (480p)" },
+  { value: "360", label: "360p" },
+  { value: "240", label: "240p" },
+  { value: "144", label: "144p" },
+];
+
 type JobStatus = "pending" | "converting" | "done" | "error";
 
 type Job = {
@@ -65,6 +77,7 @@ function App() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [videoFormat, setVideoFormat] = useState<string>("mp4");
   const [audioFormat, setAudioFormat] = useState<string>("mp3");
+  const [videoQuality, setVideoQuality] = useState<string>("original");
   const [isDragActive, setIsDragActive] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -170,6 +183,7 @@ function App() {
           jobId: job.id,
           inputPath: job.path,
           outputFormat,
+          quality: activeTab === "video" ? videoQuality : "original",
         });
         setJobs((prev) =>
           prev.map((j) =>
@@ -383,6 +397,23 @@ function App() {
               ))}
             </select>
           </div>
+
+          {activeTab === "video" && (
+            <div className="control-group">
+              <label htmlFor="quality">Calidad</label>
+              <select
+                id="quality"
+                value={videoQuality}
+                onChange={(e) => setVideoQuality(e.target.value)}
+              >
+                {VIDEO_QUALITIES.map((q) => (
+                  <option key={q.value} value={q.value}>
+                    {q.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {tabJobs.length > 0 && (
             <button type="button" className="link-button" onClick={clearTab}>
