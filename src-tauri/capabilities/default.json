@@ -8,6 +8,8 @@
     "core:event:default",
     "opener:default",
     "dialog:default",
+    "updater:default",
+    "process:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [

@@ -3,7 +3,17 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { check as checkForUpdate } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import "./App.css";
+
+type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "downloading"
+  | "restarting"
+  | "up-to-date"
+  | "error";
 
 type MediaKind = "video" | "audio";
 
@@ -81,6 +91,9 @@ function App() {
   const [isDragActive, setIsDragActive] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [updateError, setUpdateError] = useState<string>();
 
   const jobsRef = useRef(jobs);
   jobsRef.current = jobs;
@@ -205,6 +218,41 @@ function App() {
     setIsConverting(false);
   }
 
+  async function handleCheckForUpdate() {
+    setUpdateStatus("checking");
+    setUpdateError(undefined);
+    setUpdateProgress(0);
+    try {
+      const update = await checkForUpdate();
+      if (!update) {
+        setUpdateStatus("up-to-date");
+        return;
+      }
+      setUpdateStatus("downloading");
+      let totalBytes = 0;
+      let downloadedBytes = 0;
+      await update.downloadAndInstall((event) => {
+        if (event.event === "Started") {
+          totalBytes = event.data.contentLength ?? 0;
+        } else if (event.event === "Progress") {
+          downloadedBytes += event.data.chunkLength;
+          setUpdateProgress(
+            totalBytes > 0
+              ? Math.min(100, (downloadedBytes / totalBytes) * 100)
+              : 0,
+          );
+        } else if (event.event === "Finished") {
+          setUpdateProgress(100);
+        }
+      });
+      setUpdateStatus("restarting");
+      await relaunch();
+    } catch (err) {
+      setUpdateStatus("error");
+      setUpdateError(String(err));
+    }
+  }
+
   async function downloadOne(job: Job) {
     if (!job.outputPath) return;
     const dest = await save({ defaultPath: fileNameOf(job.outputPath) });
@@ -276,8 +324,36 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>TransformerSP</h1>
-        <p>Convertí audio y video localmente, sin subir nada a internet.</p>
+        <div className="app-header-top">
+          <div>
+            <h1>TransformerSP</h1>
+            <p>Convertí audio y video localmente, sin subir nada a internet.</p>
+          </div>
+          <div className="update-box">
+            <button
+              type="button"
+              className="secondary small"
+              disabled={updateStatus === "checking" || updateStatus === "downloading" || updateStatus === "restarting"}
+              onClick={handleCheckForUpdate}
+            >
+              {updateStatus === "checking" && "Buscando actualización..."}
+              {updateStatus === "downloading" &&
+                `Descargando... ${updateProgress.toFixed(0)}%`}
+              {updateStatus === "restarting" && "Reiniciando..."}
+              {(updateStatus === "idle" ||
+                updateStatus === "up-to-date" ||
+                updateStatus === "error") && "Buscar actualización"}
+            </button>
+            {updateStatus === "up-to-date" && (
+              <span className="update-hint">Ya tenés la última versión</span>
+            )}
+            {updateStatus === "error" && (
+              <span className="update-hint update-hint-error" title={updateError}>
+                No se pudo actualizar
+              </span>
+            )}
+          </div>
+        </div>
       </header>
 
       <div className="tabs">

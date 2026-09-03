@@ -26,6 +26,13 @@ body {
   padding: 28px 40px 36px;
 }
 
+.app-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .app-header h1 {
   margin: 0 0 4px;
   font-size: 22px;
@@ -37,6 +44,23 @@ body {
   margin: 0 0 24px;
   color: #6b7280;
   font-size: 13px;
+}
+
+.update-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.update-hint {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.update-hint-error {
+  color: #b91c1c;
 }
 
 .tabs {

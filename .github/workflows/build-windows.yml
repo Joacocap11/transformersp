@@ -28,24 +28,26 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
-      - name: Build Tauri app (Windows installers)
-        run: npm run tauri build
+      # El tag "latest-windows" es fijo y se reutiliza en cada build. Como el
+      # nombre del instalador incluye la version (ej. TransformerSP_0.2.0_x64-setup.exe),
+      # si no se borra el release anterior los assets de versiones viejas se
+      # van acumulando ahi en vez de reemplazarse.
+      - name: Borrar release anterior (se recrea limpio en este mismo build)
+        run: gh release delete latest-windows --yes --cleanup-tag
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
 
-      - name: Upload installers (build artifact)
-        uses: actions/upload-artifact@v4
+      - name: Build y publicar (instalador + firma para el auto-updater)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          name: TransformerSP-Windows-Installers
-          path: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
-
-      - name: Publish public release with installers
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest-windows
-          name: TransformerSP (Windows) - último build
-          body: Instalador generado automáticamente desde el último commit en main. No requiere login para descargar.
-          make_latest: true
-          files: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
+          tagName: latest-windows
+          releaseName: "TransformerSP (Windows) - último build"
+          releaseBody: Instalador generado automáticamente desde el último commit en main. No requiere login para descargar. La app se actualiza sola con el botón "Buscar actualización".
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
